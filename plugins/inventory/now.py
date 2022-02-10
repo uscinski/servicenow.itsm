@@ -30,7 +30,7 @@ from ..module_utils.relations import (
 
 
 DOCUMENTATION = r"""
-name: now
+name: servicenow.itsm.now
 plugin_type: inventory
 author:
   - Manca Bizjak (@mancabizjak)
