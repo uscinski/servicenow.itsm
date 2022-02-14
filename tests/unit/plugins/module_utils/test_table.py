@@ -215,3 +215,41 @@ class TestFindUser:
         user = table.find_user(table_client, "test")
 
         assert dict(sys_id="1234", user_name="test") == user
+
+
+class TestTableListDottedRecords:
+    @pytest.mark.parametrize(
+        "record,keys,value,expected",
+        [
+            (dict(), ["a"], "a_val", dict(a="a_val")),
+            (dict(), ["a", "b"], "a.b_val", dict(a=dict(b="a.b_val"))),
+            (dict(), ["a", "b", "c"], "a.b.c_val", dict(a=dict(b=dict(c="a.b.c_val")))),
+            (dict(b="b_val"), ["a"], "a_val", dict(a="a_val", b="b_val")),
+            (dict(a=dict(b="a.b_val")), ["a", "c"], "a.c_val", dict(a=dict(b="a.b_val", c="a.c_val"))),
+            (
+                dict(a=dict(b=dict(c="a.b.c_val", d="a.b.d_val"), e="a.e_val")),
+                ["a", "b", "f"], "a.b.f_val",
+                dict(a=dict(b=dict(c="a.b.c_val", d="a.b.d_val", f="a.b.f_val"), e="a.e_val")),
+            ),
+        ]
+    )
+    def test_record_rec(self, record, keys, value, expected):
+        t = table.TableClient(None)
+        t._record_rec(record, keys, value)
+        assert record == expected
+
+    @pytest.mark.parametrize(
+        "record,expected",
+        [
+            (dict(), dict()),
+            (dict(a="a_val"), dict(a="a_val")),
+            (
+                {"a": "a_val", "b.c": "b.c_val"},
+                {"a": "a_val", "b.c": "b.c_val", "b": {"c": "b.c_val"}}
+            )
+        ]
+    )
+    def test_record_dot2dict(self, record, expected):
+        t = table.TableClient(None)
+        actual = t._record_dot2dict(record)
+        assert actual == expected
