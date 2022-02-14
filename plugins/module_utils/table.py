@@ -26,7 +26,7 @@ class TableClient:
         self.client = client
         self.batch_size = batch_size
 
-    def list_records(self, table, query=None):
+    def list_records(self, table, query=None, dot2dict=False):
         base_query = _query(query)
         base_query["sysparm_limit"] = self.batch_size
 
@@ -43,7 +43,35 @@ class TableClient:
             total = int(response.headers["x-total-count"])
             offset += self.batch_size
 
+        # TODO: dotted keys to nested dictionaries
+        if dot2dict:
+            result = self._dot2dict(result)
         return result
+
+    def _dot2dict(self, records):
+        for i, record in enumerate(records):
+            records[i] = self._record_dot2dict(record)
+
+    def _record_dot2dict(self, record):
+        out_record = dict()
+        for k, v in record.items():
+            out_record[k] = v  # copy original key-value pairs
+
+            self._record_rec(out_record, k.split("."), v)
+
+        return out_record
+
+    def _record_rec(self, nested_record, dotted_keys, value):
+        if len(dotted_keys) == 0:
+            assert False  # should not happen
+        elif len(dotted_keys) == 1:
+            key = dotted_keys[0]
+            nested_record[key] = value
+        else:
+            key = dotted_keys[0]
+            r = nested_record.get(key, dict())
+            self._record_rec(r, dotted_keys[1:], value)
+            nested_record[key] = r
 
     def get_record(self, table, query, must_exist=False):
         records = self.list_records(table, query)
