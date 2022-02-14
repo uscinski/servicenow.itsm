@@ -4,7 +4,6 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
-from unicodedata import category
 
 __metaclass__ = type
 
@@ -973,7 +972,7 @@ class TestIssue119:
         # Dot walking does not work well with keyed groups.
         # If the key includes invalid characters, such as . in location.u_number,
         # the groups are not created.
-        # Other than that it works fine, if additional preffix of the newly-formed
+        # Other than that it works fine, if additional prefix of the newly-formed
         # groups is acceptable.
         """
         plugin: servicenow.itsm.now
@@ -1105,12 +1104,21 @@ class TestIssue119:
             dict({"location.u_number": "3,303"}, sys_id="3", ip_address="1.1.1.3", name="a3", category="Resource", install_status="Removed"),
         ]
 
-        columns = ["name", "install_status", "category", "location.u_number"]
+        records_fix = []
+
+        for record in records:
+            record_fix = {}
+            for k, v in record.items():
+                record_fix[k.replace(".", "_")] = v
+            records_fix.append(record_fix)
+
+        # columns = ["name", "install_status", "category", "location.u_number"]
+        columns = ["name", "install_status", "category", "location_u_number"]
         host_source = "ip_address"
         name_source = "name"
-        compose = dict(
-            location_u_number="location.u_number",
-        )
+        compose = dict()
+        #     location_u_number="location.u_number",
+        # )
         groups = {}
         keyed_groups = [
             dict(
@@ -1123,7 +1131,7 @@ class TestIssue119:
         enhanced = False
 
         inventory_plugin.fill_constructed(
-            records,
+            records_fix,
             columns,
             host_source,
             name_source,
@@ -1187,3 +1195,16 @@ class TestIssue119:
             install_status="Removed",
             category="Resource",
         )
+
+    def test_templar(self, inventory_plugin):
+        t = inventory_plugin.templar
+        vars = {"a.b": "a.b_val", "c": "c_val"}
+
+        vars_fix = {}
+        for k, v in vars.items():
+            vars_fix[k.replace(".", "_")] = v
+
+        t.available_variables = vars_fix
+
+        t.template("{{ c }}")
+        t.template("{{ a_b }}")
