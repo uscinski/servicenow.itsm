@@ -28,6 +28,7 @@ def inventory_plugin():
     plugin = now.InventoryModule()
     plugin.inventory = InventoryData()
     plugin.templar = Templar(loader=None)
+    plugin._load_name = None
     return plugin
 
 
@@ -1078,7 +1079,7 @@ class TestIssue119:
             category="Resource",
         )
 
-    def test_issue119_keyed_groups_with_compose(self, inventory_plugin):
+    def test_issue119_keyed_groups_with_compose_dot2underscore(self, inventory_plugin):
         """
         plugin: servicenow.itsm.now
         columns:
@@ -1104,13 +1105,7 @@ class TestIssue119:
             dict({"location.u_number": "3,303"}, sys_id="3", ip_address="1.1.1.3", name="a3", category="Resource", install_status="Removed"),
         ]
 
-        records_fix = []
-
-        for record in records:
-            record_fix = {}
-            for k, v in record.items():
-                record_fix[k.replace(".", "_")] = v
-            records_fix.append(record_fix)
+        records_fix = self.records_dot2underscore(records)
 
         # columns = ["name", "install_status", "category", "location.u_number"]
         columns = ["name", "install_status", "category", "location_u_number"]
@@ -1196,15 +1191,196 @@ class TestIssue119:
             category="Resource",
         )
 
-    def test_templar(self, inventory_plugin):
+    def test_issue119_keyed_groups_with_compose_flat2nested(self, inventory_plugin):
+        """
+        plugin: servicenow.itsm.now
+        columns:
+        - name
+        - install_status
+        - category
+        - location.u_number
+        table: cmdb_ci_ip_router
+        query:
+        - category: = Infrastructure succ
+        - install_status: IN 1,101
+        compose:
+            location_u_number: location.u_number
+        keyed_groups:
+          - key: location.u_number
+            default_value: 1,101
+            prefix: g
+        """
+
+        records = [
+            dict({"location.u_number": "1,101"}, sys_id="1", ip_address="1.1.1.1", name="a1", category="Resource", install_status="Installed"),
+            dict({"location.u_number": "2,202"}, sys_id="2", ip_address="1.1.1.2", name="a2", category="Resource", install_status="Not installed"),
+            dict({"location.u_number": "3,303"}, sys_id="3", ip_address="1.1.1.3", name="a3", category="Resource", install_status="Removed"),
+        ]
+
+        records_fix = self.flat_records_to_nested(records)
+
+        columns = ["name", "install_status", "category", "location.u_number"]
+        host_source = "ip_address"
+        name_source = "name"
+        compose = dict(
+            location_u_number="location.u_number"
+        )
+        groups = {}
+        keyed_groups = [
+            dict(
+                key="location.u_number",
+                default_value="1,101",
+            )
+        ]
+        strict = False
+        enhanced = False
+
+        inventory_plugin._options = dict(leading_separator=False)
+
+        inventory_plugin.fill_constructed(
+            records_fix,
+            columns,
+            host_source,
+            name_source,
+            compose,
+            groups,
+            keyed_groups,
+            strict,
+            enhanced,
+        )
+
+        assert set(inventory_plugin.inventory.groups) == set(
+            (
+                "all",
+                "ungrouped",
+                "1,101",
+                "2,202",
+                "3,303",
+            ),
+        )
+
+        assert set(inventory_plugin.inventory.hosts) == set(("a1", "a2", "a3"))
+
+        a1 = inventory_plugin.inventory.get_host("a1")
+        a1_groups = (group.name for group in a1.groups)
+        assert set(a1_groups) == set(("1,101",))
+
+        assert a1.vars == dict(
+            {"location.u_number": "1,101"},
+            location_u_number="1,101",
+            inventory_file=None,
+            inventory_dir=None,
+            ansible_host="1.1.1.1",
+            name="a1",
+            install_status="Installed",
+            category="Resource",
+        )
+
+        a2 = inventory_plugin.inventory.get_host("a2")
+        a2_groups = (group.name for group in a2.groups)
+        assert set(a2_groups) == set(("2,202",))
+
+        assert a2.vars == dict(
+            {"location.u_number": "2,202"},
+            location_u_number="2,202",
+            inventory_file=None,
+            inventory_dir=None,
+            ansible_host="1.1.1.2",
+            name="a2",
+            install_status="Not installed",
+            category="Resource",
+        )
+
+        a3 = inventory_plugin.inventory.get_host("a3")
+        a3_groups = (group.name for group in a3.groups)
+        assert set(a3_groups) == set(("3,303",))
+
+        assert a3.vars == dict(
+            {"location.u_number": "3,303"},
+            location_u_number="3,303",
+            inventory_file=None,
+            inventory_dir=None,
+            ansible_host="1.1.1.3",
+            name="a3",
+            install_status="Removed",
+            category="Resource",
+        )
+
+    def test_templar_dot2underscore(self, inventory_plugin):
         t = inventory_plugin.templar
-        vars = {"a.b": "a.b_val", "c": "c_val"}
+        record = {"a.b": "a.b_val", "c": "c_val"}
 
-        vars_fix = {}
-        for k, v in vars.items():
-            vars_fix[k.replace(".", "_")] = v
+        # input to fetch (dot notation needed)
+        #  - table
+        #  - query
+        # input to fill (_ notation needed?)
+        #  - records
+        #  - columns  (verbatim copy)
+        #  - host_source  (verbatim copy)
+        #  - name_source   (verbatim copy)
+        #  - compose   (verbatim copy of the key; Jinja2 of the value)
+        #  - groups    (self._sanitize_group_name)
+        #  - keyed_groups  (key: evaluated Jinja2 expression)
 
-        t.available_variables = vars_fix
+        record_fix = self.record_dot2underscore(record)
+        t.available_variables = record_fix
 
         t.template("{{ c }}")
         t.template("{{ a_b }}")
+
+    def test_templar_dot2dict(self, inventory_plugin):
+        t = inventory_plugin.templar
+        record = {"a.b": "a.b_val", "c": "c_val", "e.f.g.h.j": "e.f.g.h.j_val"}
+
+        # input to fetch (dot notation needed)
+        #  - table
+        #  - query
+        # input to fill (_ notation needed?)
+        #  - records
+        #  - columns  (verbatim copy)
+        #  - host_source  (verbatim copy)
+        #  - name_source   (verbatim copy)
+        #  - compose   (verbatim copy of the key; Jinja2 of the value)
+        #  - groups    (self._sanitize_group_name)
+        #  - keyed_groups  (key: evaluated Jinja2 expression (no dots!))
+
+        record_fix = self.flat_record_to_nested(record)
+        t.available_variables = record_fix
+
+        res = t.template("{{ c }}")
+        assert res == "c_val"
+        res = t.template("{{ a.b }}")
+        assert res == "a.b_val"
+        res = t.template("{{ e.f.g.h.j }}")
+        assert res == "e.f.g.h.j_val"
+        res = t.template("{{ a }}")
+        assert res == dict(b="a.b_val")
+        res = t.template("{{ e }}")
+        assert res == dict(f=dict(g=dict(h=dict(j="e.f.g.h.j_val"))))
+
+    def flat_record_to_nested(self, record):
+        record_fix = {}
+        for k, v in record.items():
+            record_fix[k] = v  # keep also the original key-value pair
+            k_parts = k.split(".")
+            r = {k_parts[-1] : v}
+            for k_part in k_parts[-2::-1]:
+                r = {k_part: r}
+            record_fix.update(r)
+        return record_fix
+
+    def flat_records_to_nested(self, records):
+        for i in range(len(records)):
+            records[i] = self.flat_record_to_nested(records[i])
+        return records
+
+    def records_dot2underscore(self, records):
+        for i in range(len(records)):
+            records[i] = self.record_dot2underscore(records[i])
+        return records
+
+    def record_dot2underscore(self, record):
+        record_fix = {}
+        for k, v in record.items():
+            record_fix[k.replace(".", "_")] = v
+        return record_fix
