@@ -55,7 +55,7 @@ class TableClient:
     def _record_dot2dict(self, record):
         out_record = dict()
         for k, v in record.items():
-            out_record[k] = v  # copy original key-value pairs
+            out_record[k] = {".": v}  # copy original key-value pairs
 
             self._record_rec(out_record, k.split("."), v)
 
@@ -66,7 +66,7 @@ class TableClient:
             assert False  # should not happen
         elif len(dotted_keys) == 1:
             key = dotted_keys[0]
-            nested_record[key] = value
+            nested_record[key] = {".": value}
         else:
             key = dotted_keys[0]
             r = nested_record.get(key, dict())
