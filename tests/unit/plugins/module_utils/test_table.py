@@ -221,15 +221,15 @@ class TestTableListDottedRecords:
     @pytest.mark.parametrize(
         "record,keys,value,expected",
         [
-            (dict(), ["a"], "a_val", dict(a="a_val")),
-            (dict(), ["a", "b"], "a.b_val", dict(a=dict(b="a.b_val"))),
-            (dict(), ["a", "b", "c"], "a.b.c_val", dict(a=dict(b=dict(c="a.b.c_val")))),
-            (dict(b="b_val"), ["a"], "a_val", dict(a="a_val", b="b_val")),
-            (dict(a=dict(b="a.b_val")), ["a", "c"], "a.c_val", dict(a=dict(b="a.b_val", c="a.c_val"))),
+            (dict(), ["a"], "a_val", {"a": {".": "a_val"}}),
+            (dict(), ["a", "b"], "a.b_val", {"a": {"b": {".": "a.b_val"}}}),
+            (dict(), ["a", "b", "c"], "a.b.c_val", {"a": {"b": {"c": {".": "a.b.c_val"}}}}),
+            (dict(b="b_val"), ["a"], "a_val", {"a": {".": "a_val"}, "b": "b_val"}),
+            (dict(a=dict(b="a.b_val")), ["a", "c"], "a.c_val", {"a": {"b": "a.b_val", "c": {".": "a.c_val"}}}),
             (
                 dict(a=dict(b=dict(c="a.b.c_val", d="a.b.d_val"), e="a.e_val")),
                 ["a", "b", "f"], "a.b.f_val",
-                dict(a=dict(b=dict(c="a.b.c_val", d="a.b.d_val", f="a.b.f_val"), e="a.e_val")),
+                {"a": {"b": {"c": "a.b.c_val", "d": "a.b.d_val", "f": {".": "a.b.f_val"}}, "e": "a.e_val"}},
             ),
         ]
     )
@@ -242,10 +242,14 @@ class TestTableListDottedRecords:
         "record,expected",
         [
             (dict(), dict()),
-            (dict(a="a_val"), dict(a="a_val")),
+            (dict(a="a_val"), {"a": {".": "a_val"}}),
             (
                 {"a": "a_val", "b.c": "b.c_val"},
-                {"a": "a_val", "b.c": "b.c_val", "b": {"c": "b.c_val"}}
+                {"a": {".": "a_val"}, "b.c": {".": "b.c_val"}, "b": {"c": {".": "b.c_val"}}}
+            ),
+            (
+                {"a": "a_val", "a.b": "a.b_val"},
+                {"a.b": {".": "a.b_val"}, "a": {".": "a_val", "b": {".": "a.b_val"}}},
             )
         ]
     )
@@ -253,3 +257,18 @@ class TestTableListDottedRecords:
         t = table.TableClient(None)
         actual = t._record_dot2dict(record)
         assert actual == expected
+
+    def test_mydict(self):
+        d1 = dict({"a": {".": "a_val"}})
+        d = MyDict({"a": {".": "a_val"}})
+        assert d["a"] == "a_val"
+
+
+from collections import UserDict
+class MyDict(UserDict):
+    def __getitem__(self, key):
+        d = self.data[key]
+        if "." in d:
+            return d["."]
+        else:
+            return d
