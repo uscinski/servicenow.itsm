@@ -260,7 +260,7 @@ class TestTableListDottedRecords:
 
     def test_mydict(self):
         d1 = dict({"a": {".": "a_val"}})
-        d = MyDict({"a": {".": "a_val"}})
+        d = MyDict(a={".": "a_val"})
         assert d["a"] == "a_val"
 
 

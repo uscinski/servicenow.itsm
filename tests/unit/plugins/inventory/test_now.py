@@ -1384,3 +1384,30 @@ class TestIssue119:
         for k, v in record.items():
             record_fix[k.replace(".", "_")] = v
         return record_fix
+
+    def test_lookup_with_nested_mapping(self, inventory_plugin):
+        record = MyDict(a=MyDict(b=MyDict({".value": "a.b_val"})))
+
+        t = inventory_plugin.templar
+        t.available_variables = record
+
+        result = t.template("{{ a.b }}")
+        result = MyDict(result)
+        assert isinstance(result, MyDict)
+        assert str(result) == "a.b_val"
+        assert MyDict.calls == [("__getitem__", "a"), ("__getitem__", "b"), ("__str__")]
+
+
+from collections import UserDict
+
+
+class MyDict(UserDict):
+    calls = []
+
+    def __getitem__(self, key):
+        self.calls.append(("__getitem__", key))
+        return super().__getitem__(key)
+
+    def __str__(self):
+        self.calls.append(("__str__",))
+        return self.data[".value"]
