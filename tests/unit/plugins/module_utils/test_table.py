@@ -5,6 +5,8 @@
 
 from __future__ import absolute_import, division, print_function
 
+from jinja2 import UndefinedError
+
 __metaclass__ = type
 
 import sys
@@ -217,6 +219,9 @@ class TestFindUser:
         assert dict(sys_id="1234", user_name="test") == user
 
 
+
+undefined_list = []
+env = None
 class TestTableListDottedRecords:
     @pytest.mark.parametrize(
         "record,keys,value,expected",
@@ -259,13 +264,102 @@ class TestTableListDottedRecords:
         assert actual == expected
 
     def test_mydict(self):
-        d1 = dict({"a": {".": "a_val"}})
         d = MyDict(a={".": "a_val"})
         assert d["a"] == "a_val"
+
+    def test_jinja(self):
+        from jinja2 import Environment, meta
+        env = Environment()
+        ast = env.parse("{{ a.b.c }}")
+
+        n1 = ast.find(meta.nodes.Getattr)
+        assert n1.attr == "c"
+        assert n1.node.attr == "b"
+        assert n1.node.node.name == "a"
+
+        ast = env.parse("{{ 3 + e['f'] | string }}")
+
+        n1 = ast.find(meta.nodes.Getitem)
+        assert n1.arg.value == "f"
+        assert n1.node.name == "e"
+
+    def test_jinja_template(self):
+        from jinja2 import Template
+        t = Template("{{ a.b + 3 }}", finalize=self.finalize)
+
+        res = t.render(dict(a=dict(b=6)))
+
+        assert res == '9'
+
+    def test_jinja_template_type_error(self):
+        from jinja2 import Template
+        t = Template("{{ a.b + 3 }}", finalize=self.finalize)
+
+        with pytest.raises(TypeError):
+            t.render(dict(a=dict(b={".value": 6})))
+
+    def test_jinja_template_catch_undefined(self):
+        from jinja2 import Template, ChainableUndefined
+        import re
+        t = Template("{{ a.b + 3 }}")
+
+        try:
+            t.render()
+        except UndefinedError as undef_err:
+            assert undef_err.message == "'a' is undefined"
+            node_re = re.compile(r"'(\w+)' is undefined")
+            m = node_re.match(undef_err.message)
+            assert m.group(1) == "a"
+
+        try:
+            t.render(a='a_val')
+        except UndefinedError as undef_err:
+            assert undef_err.message == "'str object' has no attribute 'b'"
+            attr_re = re.compile(r"'str object' has no attribute '(\w+)'")
+            m = attr_re.match(undef_err.message)
+            assert m.group(1) == "b"
+
+        res = t.render(a=dict(b=2))
+        assert res == '5'
+
+    def test_jinja_template_catch_chainable_undefined(self):
+        from jinja2 import Template, ChainableUndefined
+        import re
+        t = Template("{{ a.b + 3 }}", undefined=ChainableUndefined)
+
+        try:
+            t.render()
+        except UndefinedError as undef_err:
+            assert undef_err.message == "'a' is undefined"
+            node_re = re.compile(r"'(\w+)' is undefined")
+            m = node_re.match(undef_err.message)
+            assert m.group(1) == "a"
+
+        try:
+            t.render(a='a_val')
+        except UndefinedError as undef_err:
+            assert undef_err.message == "'str object' has no attribute 'b'"
+            attr_re = re.compile(r"'str object' has no attribute '(\w+)'")
+            m = attr_re.match(undef_err.message)
+            assert m.group(1) == "b"
+
+        res = t.render(a=dict(b=2))
+        assert res == '5'
+
+    def finalize(self, var):
+        return var
 
 
 from collections import UserDict
 class MyDict(UserDict):
+    calls = []
+    
+    def __init__(self, *args, undefined_vars=[], **kwargs):
+        self._previous = None
+        self._undefined_vars = undefined_vars
+        self._pos = 0
+        super().__init__(*args, **kwargs)
+
     def __getitem__(self, key):
         d = self.data[key]
         if "." in d:
