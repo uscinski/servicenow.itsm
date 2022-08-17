@@ -5,6 +5,43 @@ servicenow.itsm Release Notes
 .. contents:: Topics
 
 
+v2.0.0
+======
+
+Release Summary
+---------------
+
+Added modules for downloading attachments and performing Table REST API calls. Idempotent configuration items.
+
+Minor Changes
+-------------
+
+- Attachment integration tests - Add missing register variables (https://github.com/ansible-collections/servicenow.itsm/pull/194)
+- TableClient - Remove hardcoded value of sysparm_exclude_reference_link when querying on table api.
+- \*_info modules - Added additional module parameter sysparm_display_value to all info modules, which, if set to either true or all, enables the user to see the values of sys_tags.
+- \*_info modules - Added field sysparm_query, which represents an encoded query string used to filter the results as an alternative to C(query) (https://github.com/ansible-collections/servicenow.itsm/pull/190).
+- api - Added module api, which essentially codifies the ServiceNow REST API explorer in Ansible-native way for POST, PATCH and DELETE operations.
+- api - Enhanced api module with template processing capabilities as an alternative to its data parameter for creating or updating a resource (https://github.com/ansible-collections/servicenow.itsm/pull/201).
+- api_info - Added module api_info, which essentially codifies the ServiceNow REST API explorer in Ansible-native way for retrieving records (GET operations).
+- attachment integration tests - Adapt integration tests for attachment module due to changes on PR 192 (https://github.com/ansible-collections/servicenow.itsm/pull/193)
+- configuration_batch_item - now returns result instead only if something was changed or not.
+- configuration_item_info - Added option name to simplify queries based on that parameter.
+- module_utils/attachments.py - Add ``get_attachment`` and ``save_attachment`` (https://github.com/ansible-collections/servicenow.itsm/pull/186).
+- now - Added field sysparm_query, which represents an encoded query string used to filter the results as an alternative to C(query) (https://github.com/ansible-collections/servicenow.itsm/pull/190).
+- test_api - Remove unused import which caused sanity error. (https://github.com/ansible-collections/servicenow.itsm/pull/204)
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- configuration_item - Added name as a unique identifier. This means that the idempotence is based on name, while previously there was no idempotence (except for sys_id). When state=present if a configuration item with given name does not exist, the item is created. If it already exists, it is updated. (https://github.com/ansible-collections/servicenow.itsm/pull/192)
+
+New Modules
+-----------
+
+- servicenow.itsm.api - Manage ServiceNow POST, PATCH and DELETE requests
+- servicenow.itsm.api_info - Manage ServiceNow GET requests
+- servicenow.itsm.attachment - a module that users can use to download attachment using sys_id
+
 v1.4.0
 ======
 
