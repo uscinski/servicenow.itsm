@@ -610,62 +610,6 @@
    "format": 1
   },
   {
-   "name": "make_manifest.py",
-   "ftype": "file",
-   "chksum_type": "sha256",
-   "chksum_sha256": "5a665b480e326d77b5c97c6b13ee1dd75360d62042a8d753b81df6635d28140b",
-   "format": 1
-  },
-  {
-   "name": ".pytest_cache",
-   "ftype": "dir",
-   "chksum_type": null,
-   "chksum_sha256": null,
-   "format": 1
-  },
-  {
-   "name": ".pytest_cache/.gitignore",
-   "ftype": "file",
-   "chksum_type": "sha256",
-   "chksum_sha256": "3ed731b65d06150c138e2dadb0be0697550888a6b47eb8c45ecc9adba8b8e9bd",
-   "format": 1
-  },
-  {
-   "name": ".pytest_cache/CACHEDIR.TAG",
-   "ftype": "file",
-   "chksum_type": "sha256",
-   "chksum_sha256": "ffacb1561d9688b9d9b5e06f3ffa10814a03c2a6f892d7bea3e7fef62599eb23",
-   "format": 1
-  },
-  {
-   "name": ".pytest_cache/v",
-   "ftype": "dir",
-   "chksum_type": null,
-   "chksum_sha256": null,
-   "format": 1
-  },
-  {
-   "name": ".pytest_cache/v/cache",
-   "ftype": "dir",
-   "chksum_type": null,
-   "chksum_sha256": null,
-   "format": 1
-  },
-  {
-   "name": ".pytest_cache/v/cache/stepwise",
-   "ftype": "file",
-   "chksum_type": "sha256",
-   "chksum_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-   "format": 1
-  },
-  {
-   "name": ".pytest_cache/README.md",
-   "ftype": "file",
-   "chksum_type": "sha256",
-   "chksum_sha256": "27a7071ba39c9ef4054eaf99bc59e3f0aa328a62166f426e6549ef923ade7533",
-   "format": 1
-  },
-  {
    "name": "changelogs",
    "ftype": "dir",
    "chksum_type": null,
@@ -719,13 +663,6 @@
    "ftype": "file",
    "chksum_type": "sha256",
    "chksum_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-   "format": 1
-  },
-  {
-   "name": "out",
-   "ftype": "dir",
-   "chksum_type": null,
-   "chksum_sha256": null,
    "format": 1
   },
   {
@@ -1296,66 +1233,10 @@
    "format": 1
   },
   {
-   "name": "tests/integration/integration_config.yml",
-   "ftype": "file",
-   "chksum_type": "sha256",
-   "chksum_sha256": "9b30f916c1b022f7607f0280103cd10f3e48aa7e195aef39fb09d7bfb91c6868",
-   "format": 1
-  },
-  {
    "name": "tests/integration/integration_config.yml.template",
    "ftype": "file",
    "chksum_type": "sha256",
    "chksum_sha256": "ef4ed6627c2628a27f3d595097f19c2f8b3d7af231b7371a8860b162e4d7569b",
-   "format": 1
-  },
-  {
-   "name": "tests/.pytest_cache",
-   "ftype": "dir",
-   "chksum_type": null,
-   "chksum_sha256": null,
-   "format": 1
-  },
-  {
-   "name": "tests/.pytest_cache/.gitignore",
-   "ftype": "file",
-   "chksum_type": "sha256",
-   "chksum_sha256": "3ed731b65d06150c138e2dadb0be0697550888a6b47eb8c45ecc9adba8b8e9bd",
-   "format": 1
-  },
-  {
-   "name": "tests/.pytest_cache/CACHEDIR.TAG",
-   "ftype": "file",
-   "chksum_type": "sha256",
-   "chksum_sha256": "ffacb1561d9688b9d9b5e06f3ffa10814a03c2a6f892d7bea3e7fef62599eb23",
-   "format": 1
-  },
-  {
-   "name": "tests/.pytest_cache/v",
-   "ftype": "dir",
-   "chksum_type": null,
-   "chksum_sha256": null,
-   "format": 1
-  },
-  {
-   "name": "tests/.pytest_cache/v/cache",
-   "ftype": "dir",
-   "chksum_type": null,
-   "chksum_sha256": null,
-   "format": 1
-  },
-  {
-   "name": "tests/.pytest_cache/v/cache/stepwise",
-   "ftype": "file",
-   "chksum_type": "sha256",
-   "chksum_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-   "format": 1
-  },
-  {
-   "name": "tests/.pytest_cache/README.md",
-   "ftype": "file",
-   "chksum_type": "sha256",
-   "chksum_sha256": "27a7071ba39c9ef4054eaf99bc59e3f0aa328a62166f426e6549ef923ade7533",
    "format": 1
   },
   {
@@ -1559,55 +1440,6 @@
    "ftype": "file",
    "chksum_type": "sha256",
    "chksum_sha256": "788e13015167c51d231b7613e5411df53539cca69f2d4ec262cbeeb984705a1b",
-   "format": 1
-  },
-  {
-   "name": "tests/unit/plugins/.pytest_cache",
-   "ftype": "dir",
-   "chksum_type": null,
-   "chksum_sha256": null,
-   "format": 1
-  },
-  {
-   "name": "tests/unit/plugins/.pytest_cache/.gitignore",
-   "ftype": "file",
-   "chksum_type": "sha256",
-   "chksum_sha256": "3ed731b65d06150c138e2dadb0be0697550888a6b47eb8c45ecc9adba8b8e9bd",
-   "format": 1
-  },
-  {
-   "name": "tests/unit/plugins/.pytest_cache/CACHEDIR.TAG",
-   "ftype": "file",
-   "chksum_type": "sha256",
-   "chksum_sha256": "ffacb1561d9688b9d9b5e06f3ffa10814a03c2a6f892d7bea3e7fef62599eb23",
-   "format": 1
-  },
-  {
-   "name": "tests/unit/plugins/.pytest_cache/v",
-   "ftype": "dir",
-   "chksum_type": null,
-   "chksum_sha256": null,
-   "format": 1
-  },
-  {
-   "name": "tests/unit/plugins/.pytest_cache/v/cache",
-   "ftype": "dir",
-   "chksum_type": null,
-   "chksum_sha256": null,
-   "format": 1
-  },
-  {
-   "name": "tests/unit/plugins/.pytest_cache/v/cache/stepwise",
-   "ftype": "file",
-   "chksum_type": "sha256",
-   "chksum_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-   "format": 1
-  },
-  {
-   "name": "tests/unit/plugins/.pytest_cache/README.md",
-   "ftype": "file",
-   "chksum_type": "sha256",
-   "chksum_sha256": "27a7071ba39c9ef4054eaf99bc59e3f0aa328a62166f426e6549ef923ade7533",
    "format": 1
   },
   {
