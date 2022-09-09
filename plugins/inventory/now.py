@@ -388,67 +388,93 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
         instance_env = self._get_instance_from_env()
         return self._merge_instance_config(instance_config, instance_env)
 
-    def parse(self, inventory, loader, path, cache=True):
-        super(InventoryModule, self).parse(inventory, loader, path)
-
-        self._read_config_data(path)
-
-        try:
-            client = Client(**self._get_instance())
-        except ServiceNowError as e:
-            raise AnsibleParserError(e)
-
-        enhanced = self.get_option("enhanced")
-
-        table_client = TableClient(client)
-
-        table = self.get_option("table")
-        name_source = self.get_option("inventory_hostname_source")
-        columns = self.get_option("columns")
+    def _get_options(self):
+        self._sn_enhanced = self.get_option("enhanced")
+        self._sn_table = self.get_option("table")
+        self._sn_name_source = self.get_option("inventory_hostname_source")
+        self._sn_columns = self.get_option("columns")
+        self._sn_compose = self.get_option("compose")
+        self._sn_groups = self.get_option("groups")
+        self._sn_keyed_groups = self.get_option("keyed_groups")
+        self._sn_strict = self.get_option("strict")
+        self._sn_cache = self.get_option("cache")
 
         query = self.get_option("query")
         sysparm_query = self.get_option("sysparm_query")
-
         if query and sysparm_query:
             raise AnsibleParserError(
                 "Invalid configuration: 'query' and 'sysparm_query' are mutually "
                 "exclusive."
             )
+        self._sn_query = query or sysparm_query
+        self._is_encoded_query = bool(sysparm_query)
 
-        # Try to use cached inventory content, if so desired
-        cache_key = self.get_cache_key(path)
+    def _make_table_client(self):
+        try:
+            client = Client(**self._get_instance())
+        except ServiceNowError as e:
+            raise AnsibleParserError(e)
 
-        user_cache_setting = self.get_option("cache")
-        attempt_to_read_cache = user_cache_setting and cache
-        cache_needs_update = user_cache_setting and not cache
+        self._sn_table_client = TableClient(client)
+
+    def _get_cached_records(self, cache_key):
+        return self._cache.get(cache_key)
+
+    def _pull_records_from_sn(self):
+        records = fetch_records(
+            self._sn_table_client, self._sn_table, self._sn_query, is_encoded_query=self._is_encoded_query
+        )
+
+        if self._sn_enhanced:
+            rel_records = fetch_records(
+                self._table_client, REL_TABLE, REL_QUERY, fields=REL_FIELDS
+            )
+            enhance_records_with_rel_groups(records, rel_records)
+
+        return records
+
+    def _obtain_records(self, cache_key, use_cache):
+        user_cache_setting = self._sn_cache
+        attempt_to_read_cache = user_cache_setting and use_cache
+        cache_needs_update = user_cache_setting and not use_cache
 
         if attempt_to_read_cache:
-            try:
-                records = self._cache[cache_key]
-            except KeyError:
+            records = self._get_cached_records(cache_key)
+            if records is None:
                 cache_needs_update = True
 
         if not attempt_to_read_cache or cache_needs_update:
-            records = fetch_records(
-                table_client, table, query, is_encoded_query=bool(sysparm_query)
-            )
+            records = self._pull_records_from_sn()
 
-            if enhanced:
-                rel_records = fetch_records(
-                    table_client, REL_TABLE, REL_QUERY, fields=REL_FIELDS
-                )
-                enhance_records_with_rel_groups(records, rel_records)
+        return records, cache_needs_update
 
-        if cache_needs_update:
-            self._cache[cache_key] = records
+    def _update_cache(self, cache_key, records):
+        self._cache[cache_key] = records
 
+    def _populate_inventory(self, records):
         self.fill_constructed(
             records,
-            columns,
-            name_source,
-            self.get_option("compose"),
-            self.get_option("groups"),
-            self.get_option("keyed_groups"),
-            self.get_option("strict"),
-            enhanced,
+            self._sn_columns,
+            self._sn_name_source,
+            self._sn_compose,
+            self._sn_groups,
+            self._sn_keyed_groups,
+            self._sn_strict,
+            self._sn_enhanced,
         )
+
+    def parse(self, inventory, loader, path, cache=True):
+        super(InventoryModule, self).parse(inventory, loader, path)
+
+        self._read_config_data(path)
+        cache_key = self.get_cache_key(path)
+
+        self._get_options()
+        self._make_table_client()
+
+        records, cache_needs_update = self._obtain_records(cache_key, cache)
+
+        if cache_needs_update:
+            self._update_cache(cache_key, records)
+
+        self._populate_inventory(records)
