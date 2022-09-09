@@ -422,7 +422,10 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
 
     def _pull_records_from_sn(self):
         records = fetch_records(
-            self._sn_table_client, self._sn_table, self._sn_query, is_encoded_query=self._is_encoded_query
+            self._sn_table_client,
+            self._sn_table,
+            self._sn_query,
+            is_encoded_query=self._is_encoded_query,
         )
 
         if self._sn_enhanced:
