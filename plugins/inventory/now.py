@@ -23,6 +23,7 @@ description:
 version_added: 1.0.0
 extends_documentation_fragment:
   - ansible.builtin.constructed
+  - ansible.builtin.inventory_cache
   - servicenow.itsm.query
 notes:
   - Query feature and constructed groups were added in version 1.2.0.
@@ -250,6 +251,7 @@ from ansible.inventory.group import to_safe_group_name as orig_safe
 from ansible.plugins.inventory import (
     BaseInventoryPlugin,
     Constructable,
+    Cacheable,
     to_safe_group_name,
 )
 
@@ -287,7 +289,7 @@ def fetch_records(table_client, table, query, fields=None, is_encoded_query=Fals
     return table_client.list_records(table, snow_query)
 
 
-class InventoryModule(BaseInventoryPlugin, Constructable):
+class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
 
     NAME = "servicenow.itsm.now"
 
@@ -413,16 +415,32 @@ class InventoryModule(BaseInventoryPlugin, Constructable):
                 "exclusive."
             )
 
-        # TODO: Insert caching here once we remove deprecated functionality
-        records = fetch_records(
-            table_client, table, query, is_encoded_query=bool(sysparm_query)
-        )
+        # Try to use cached inventory content, if so desired
+        cache_key = self.get_cache_key(path)
 
-        if enhanced:
-            rel_records = fetch_records(
-                table_client, REL_TABLE, REL_QUERY, fields=REL_FIELDS
+        user_cache_setting = self.get_option("cache")
+        attempt_to_read_cache = user_cache_setting and cache
+        cache_needs_update = user_cache_setting and not cache
+
+        if attempt_to_read_cache:
+            try:
+                records = self._cache[cache_key]
+            except KeyError:
+                cache_needs_update = True
+
+        if not attempt_to_read_cache or cache_needs_update:
+            records = fetch_records(
+                table_client, table, query, is_encoded_query=bool(sysparm_query)
             )
-            enhance_records_with_rel_groups(records, rel_records)
+
+            if enhanced:
+                rel_records = fetch_records(
+                    table_client, REL_TABLE, REL_QUERY, fields=REL_FIELDS
+                )
+                enhance_records_with_rel_groups(records, rel_records)
+
+        if cache_needs_update:
+            self._cache[cache_key] = records
 
         self.fill_constructed(
             records,
