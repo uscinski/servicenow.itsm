@@ -388,7 +388,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
         instance_env = self._get_instance_from_env()
         return self._merge_instance_config(instance_config, instance_env)
 
-    def _get_options(self):
+    def _get_and_validate_options(self):
         self._sn_enhanced = self.get_option("enhanced")
         self._sn_table = self.get_option("table")
         self._sn_name_source = self.get_option("inventory_hostname_source")
@@ -420,7 +420,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
     def _get_cached_records(self, cache_key):
         return self._cache.get(cache_key)
 
-    def _pull_records_from_sn(self):
+    def _fetch_records_from_sn(self):
         records = fetch_records(
             self._sn_table_client,
             self._sn_table,
@@ -430,13 +430,13 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
 
         if self._sn_enhanced:
             rel_records = fetch_records(
-                self._table_client, REL_TABLE, REL_QUERY, fields=REL_FIELDS
+                self._sn_table_client, REL_TABLE, REL_QUERY, fields=REL_FIELDS
             )
             enhance_records_with_rel_groups(records, rel_records)
 
         return records
 
-    def _obtain_records(self, cache_key, use_cache):
+    def _get_records_from_sn_or_cache(self, cache_key, use_cache):
         user_cache_setting = self._sn_cache
         attempt_to_read_cache = user_cache_setting and use_cache
         cache_needs_update = user_cache_setting and not use_cache
@@ -447,7 +447,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
                 cache_needs_update = True
 
         if not attempt_to_read_cache or cache_needs_update:
-            records = self._pull_records_from_sn()
+            records = self._fetch_records_from_sn()
 
         return records, cache_needs_update
 
@@ -472,10 +472,12 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
         self._read_config_data(path)
         cache_key = self.get_cache_key(path)
 
-        self._get_options()
+        self._get_and_validate_options()
         self._make_table_client()
 
-        records, cache_needs_update = self._obtain_records(cache_key, cache)
+        records, cache_needs_update = self._get_records_from_sn_or_cache(
+            cache_key, cache
+        )
 
         if cache_needs_update:
             self._update_cache(cache_key, records)
