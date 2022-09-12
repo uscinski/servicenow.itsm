@@ -4,6 +4,7 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
+from operator import inv
 
 __metaclass__ = type
 
@@ -17,6 +18,7 @@ from ansible.module_utils.common.text.converters import to_text
 from ansible.template import Templar
 
 from ansible_collections.servicenow.itsm.plugins.inventory import now
+from ansible_collections.servicenow.itsm.plugins.module_utils.table import TableClient
 
 pytestmark = pytest.mark.skipif(
     sys.version_info < (2, 7), reason="requires python2.7 or higher"
@@ -200,6 +202,327 @@ class TestInstance:
             grant_type="SN_GRANT_TYPE",
             timeout="SN_TIMEOUT",
         )
+
+
+class TestGetAndValidateOptions:
+    def test_get_and_validate_options_query(self, inventory_plugin, mocker):
+        def get_option(key):
+            if key == "sysparm_query":
+                return None
+            return key
+
+        mocker.patch.object(inventory_plugin, "get_option", new=get_option)
+
+        inventory_plugin._get_and_validate_options()
+
+        assert inventory_plugin._sn_enhanced == "enhanced"
+        assert inventory_plugin._sn_table == "table"
+        assert inventory_plugin._sn_name_source == "inventory_hostname_source"
+        assert inventory_plugin._sn_columns == "columns"
+        assert inventory_plugin._sn_compose == "compose"
+        assert inventory_plugin._sn_groups == "groups"
+        assert inventory_plugin._sn_keyed_groups == "keyed_groups"
+        assert inventory_plugin._sn_strict == "strict"
+        assert inventory_plugin._sn_cache == "cache"
+        assert inventory_plugin._sn_query == "query"
+        assert inventory_plugin._is_encoded_query is False
+
+    def test_get_and_validate_sysparm_query(self, inventory_plugin, mocker):
+        def get_option(key):
+            if key == "query":
+                return None
+            return key
+
+        mocker.patch.object(inventory_plugin, "get_option", new=get_option)
+
+        inventory_plugin._get_and_validate_options()
+
+        assert inventory_plugin._sn_enhanced == "enhanced"
+        assert inventory_plugin._sn_table == "table"
+        assert inventory_plugin._sn_name_source == "inventory_hostname_source"
+        assert inventory_plugin._sn_columns == "columns"
+        assert inventory_plugin._sn_compose == "compose"
+        assert inventory_plugin._sn_groups == "groups"
+        assert inventory_plugin._sn_keyed_groups == "keyed_groups"
+        assert inventory_plugin._sn_strict == "strict"
+        assert inventory_plugin._sn_cache == "cache"
+        assert inventory_plugin._sn_query == "sysparm_query"
+        assert inventory_plugin._is_encoded_query is True
+
+    def test_get_and_validate_options_both_queries(self, inventory_plugin, mocker):
+        def get_option(key):
+            return key
+
+        mocker.patch.object(inventory_plugin, "get_option", new=get_option)
+
+        with pytest.raises(AnsibleParserError, match="mutually exclusive"):
+            inventory_plugin._get_and_validate_options()
+
+
+class TestMakeTableClient:
+    def test_make_table_client(self, inventory_plugin, mocker):
+        def get_instance():
+            return dict(
+                host="https://host.com",
+                username="username",
+                password="password",
+                grant_type="grant_type",
+                refresh_token="refresh_token",
+                client_id="client_id",
+                client_secret="client_secret",
+                timeout="timeout",
+            )
+
+        mocker.patch.object(inventory_plugin, "_get_instance", new=get_instance)
+
+        inventory_plugin._make_table_client()
+
+        assert isinstance(inventory_plugin._sn_table_client, TableClient)
+
+    def test_make_table_client_fail(self, inventory_plugin, mocker):
+        def get_instance():
+            return dict(
+                host="host",
+            )
+
+        mocker.patch.object(inventory_plugin, "_get_instance", new=get_instance)
+
+        with pytest.raises(AnsibleParserError, match="host"):
+            inventory_plugin._make_table_client()
+
+
+class TestInventoryModuleCache:
+    @pytest.mark.parametrize(
+        "cache_key,expected",
+        [
+            ("path1", [dict(a="a", b="b")]),
+            ("path2", [dict(a="a", c="c")]),
+            ("path3", None),
+        ],
+    )
+    def test_get_cached_records(self, inventory_plugin, mocker, cache_key, expected):
+        cache = dict(
+            path1=[dict(a="a", b="b")],
+            path2=[dict(a="a", c="c")],
+        )
+
+        mocker.patch.object(inventory_plugin, "_cache", new=cache)
+
+        records = inventory_plugin._get_cached_records(cache_key)
+
+        assert records == expected
+
+    def test_update_cache(self, inventory_plugin, mocker):
+        mocker.patch.object(inventory_plugin, "_cache", new=dict())
+
+        inventory_plugin._update_cache("path1", [])
+        inventory_plugin._update_cache("path2", [dict(a="a")])
+
+        assert inventory_plugin._cache == dict(path1=[], path2=[dict(a="a")])
+
+
+class TestInventoryModuleGetRecords:
+    def test_fetch_records_from_sn(self, inventory_plugin, table_client):
+        inventory_plugin._sn_table_client = table_client
+        inventory_plugin._sn_table = "cmdb_ci"
+        inventory_plugin._sn_query = "name=my_ci"
+        inventory_plugin._is_encoded_query = True
+
+        inventory_plugin._sn_enhanced = False
+
+        table_client.list_records.return_value = [
+            dict(sys_id="123abc", ip_address="1.2.3.4", fqdn="01.cmdb_ci.com")
+        ]
+
+        records = inventory_plugin._fetch_records_from_sn()
+
+        assert records == [
+            dict(sys_id="123abc", ip_address="1.2.3.4", fqdn="01.cmdb_ci.com")
+        ]
+
+    def test_fetch_records_from_sn_enhanced(self, inventory_plugin, table_client):
+        inventory_plugin._sn_table_client = table_client
+        inventory_plugin._sn_table = "cmdb_ci"
+        inventory_plugin._sn_query = "name=my_ci"
+        inventory_plugin._is_encoded_query = True
+
+        inventory_plugin._sn_enhanced = True
+
+        table_client.list_records.side_effect = [
+            [dict(sys_id="123abc", ip_address="1.2.3.4", fqdn="01.cmdb_ci.com")],
+            [
+                {
+                    "child.sys_id": "123abc",
+                    "parent.name": "parent",
+                    "parent.sys_class_name": "parent_sys_class_name",
+                    "type.name": "Parent description::Child description",
+                },
+                {
+                    "parent.sys_id": "123abc",
+                    "child.name": "child",
+                    "child.sys_class_name": "child_sys_class_name",
+                    "type.name": "Parent description::Child description",
+                },
+            ],
+        ]
+
+        records = inventory_plugin._fetch_records_from_sn()
+
+        assert records == [
+            dict(
+                sys_id="123abc",
+                ip_address="1.2.3.4",
+                fqdn="01.cmdb_ci.com",
+                relationship_groups=set(
+                    ["parent_Parent_description", "child_Child_description"]
+                ),
+            )
+        ]
+
+    @pytest.mark.parametrize(
+        "user_cache,use_cache,get_cached_records_return_value,expected_cache_needs_update,expected_get_cache_records_call_count,expected_fetch_records_from_sn_call_count",
+        [
+            (True, True, [], False, 1, 0),
+            (True, False, [], True, 0, 1),
+            (False, True, [], False, 0, 1),
+            (False, False, [], False, 0, 1),
+            (True, True, None, True, 1, 1),
+        ],
+    )
+    def test_get_records_from_sn_or_cache_flow(
+        self,
+        inventory_plugin,
+        mocker,
+        user_cache,
+        use_cache,
+        get_cached_records_return_value,
+        expected_cache_needs_update,
+        expected_get_cache_records_call_count,
+        expected_fetch_records_from_sn_call_count,
+    ):
+        inventory_plugin._sn_cache = user_cache
+
+        inventory_plugin._get_cached_records = mocker.Mock()
+        inventory_plugin._get_cached_records.return_value = (
+            get_cached_records_return_value
+        )
+
+        inventory_plugin._fetch_records_from_sn = mocker.Mock()
+        inventory_plugin._fetch_records_from_sn.return_value = []
+
+        records, cache_needs_update = inventory_plugin._get_records_from_sn_or_cache(
+            "path1", use_cache
+        )
+
+        assert records == []
+        assert cache_needs_update is expected_cache_needs_update
+
+        inventory_plugin._get_cached_records.call_count == expected_get_cache_records_call_count
+        inventory_plugin._fetch_records_from_sn.call_count == expected_fetch_records_from_sn_call_count
+
+    @pytest.mark.parametrize(
+        "user_cache,use_cache,cached_records,expected_records",
+        [
+            (True, True, [dict(a="a")], [dict(a="a")]),
+            (True, False, [dict(a="a")], [dict(b="b")]),
+            (False, True, [dict(a="a")], [dict(b="b")]),
+            (False, False, [dict(a="a")], [dict(b="b")]),
+            (True, True, None, [dict(b="b")]),
+        ],
+    )
+    def test_get_records_from_sn_or_cache_records(
+        self,
+        inventory_plugin,
+        mocker,
+        user_cache,
+        use_cache,
+        cached_records,
+        expected_records,
+    ):
+        inventory_plugin._sn_cache = user_cache
+        inventory_plugin._get_cached_records = mocker.Mock()
+        inventory_plugin._get_cached_records.return_value = cached_records
+
+        inventory_plugin._fetch_records_from_sn = mocker.Mock()
+        inventory_plugin._fetch_records_from_sn.return_value = [dict(b="b")]
+
+        records, cnu = inventory_plugin._get_records_from_sn_or_cache(
+            "path1", use_cache
+        )
+
+        assert records == expected_records
+
+
+class TestPopulateInventory:
+    def test_populate_inventory(self, inventory_plugin, mocker):
+        inventory_plugin._sn_columns = "col1,col2,col3"
+        inventory_plugin._sn_name_source = "name_source"
+        inventory_plugin._sn_compose = dict(ansible_host="ip_address")
+        inventory_plugin._sn_groups = dict(group1="ip_address == 1.1.1.1")
+        inventory_plugin._sn_keyed_groups = [dict(key="key")]
+        inventory_plugin._sn_strict = False
+        inventory_plugin._sn_enhanced = True
+
+        inventory_plugin.fill_constructed = mocker.Mock()
+
+        records = [dict(ip_address="1.1.1.1")]
+
+        inventory_plugin._populate_inventory(records)
+
+        inventory_plugin.fill_constructed.assert_called_once_with(
+            records,
+            "col1,col2,col3",
+            "name_source",
+            dict(ansible_host="ip_address"),
+            dict(group1="ip_address == 1.1.1.1"),
+            [dict(key="key")],
+            False,
+            True,
+        )
+
+
+class TestInventoryModuleParse:
+    @pytest.mark.parametrize(
+        "use_cache,cache_needs_update,expected_update_cache_call_count",
+        [(True, False, 0), (False, True, 1), (True, True, 1)],
+    )
+    def test_parse(
+        self,
+        inventory_plugin,
+        mocker,
+        use_cache,
+        cache_needs_update,
+        expected_update_cache_call_count,
+    ):
+        inventory_plugin._read_config_data = mocker.Mock()
+        inventory_plugin.get_cache_key = mocker.Mock()
+        inventory_plugin.get_cache_key.return_value = "cache_key"
+        inventory_plugin._get_and_validate_options = mocker.Mock()
+        inventory_plugin._make_table_client = mocker.Mock()
+        inventory_plugin._get_records_from_sn_or_cache = mocker.Mock()
+        inventory_plugin._get_records_from_sn_or_cache.return_value = [
+            dict(a="a")
+        ], cache_needs_update
+        inventory_plugin._update_cache = mocker.Mock()
+        inventory_plugin._populate_inventory = mocker.Mock()
+
+        inventory_plugin.parse(None, None, "path1", cache=use_cache)
+
+        inventory_plugin._read_config_data.assert_called_once_with("path1")
+        inventory_plugin.get_cache_key.assert_called_once_with("path1")
+        inventory_plugin._get_and_validate_options.assert_called_once()
+        inventory_plugin._make_table_client.assert_called_once()
+        inventory_plugin._get_records_from_sn_or_cache.assert_called_once_with(
+            "cache_key", use_cache
+        )
+        inventory_plugin._update_cache.call_count == expected_update_cache_call_count
+        if expected_update_cache_call_count:
+            inventory_plugin._update_cache.assert_called_once_with(
+                "cache_key", [dict(a="a")]
+            )
+        else:
+            inventory_plugin._update_cache.assert_not_called()
+        inventory_plugin._populate_inventory.assert_called_once_with([dict(a="a")])
 
 
 class TestInventoryModuleFillEnhancedAutoGroups:
