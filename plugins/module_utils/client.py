@@ -50,6 +50,7 @@ class Client:
         username=None,
         password=None,
         grant_type=None,
+        access_token=None,
         refresh_token=None,
         client_id=None,
         client_secret=None,
@@ -68,6 +69,7 @@ class Client:
         self.grant_type = grant_type
         self.client_id = client_id
         self.client_secret = client_secret
+        self.access_token = access_token
         self.refresh_token = refresh_token
         self.timeout = timeout
         self.validate_certs = validate_certs
@@ -89,7 +91,7 @@ class Client:
     def _login_username_password(self):
         return dict(Authorization=basic_auth_header(self.username, self.password))
 
-    def _login_oauth(self):
+    def _obtain_access_token(self):
         if self.grant_type == "refresh_token":
             auth_data = urlencode(
                 dict(
@@ -119,7 +121,10 @@ class Client:
         if resp.status != 200:
             raise UnexpectedAPIResponse(resp.status, resp.data)
 
-        access_token = resp.json["access_token"]
+        return resp.json["access_token"]
+
+    def _login_oauth(self):
+        access_token = self.access_token or self._obtain_access_token()
         return dict(Authorization="Bearer {0}".format(access_token))
 
     def _request(self, method, path, data=None, headers=None):

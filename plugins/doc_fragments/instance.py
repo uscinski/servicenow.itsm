@@ -59,6 +59,14 @@ options:
             variable will be used.
           - If provided, it requires I(client_id).
         type: str
+      access_token:
+        description:
+          - Access token used for OAuth authentication.
+          - If not set, the value of the C(SN_ACCESS_TOKEN) environment
+            variable will be used.
+          - Mutually exclusive with I(username), I(client_id), I(grant_type) and I(refresh_token).
+        type: str
+        version_added: '2.1.0'
       refresh_token:
         description:
           - Refresh token used for OAuth authentication.
