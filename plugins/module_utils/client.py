@@ -87,14 +87,14 @@ class Client:
         if self.client_id and self.client_secret:
             return self._login_oauth()
         elif self.access_token:
-            return self._login_access_token()
+            return self._login_access_token(self.access_token)
         return self._login_username_password()
 
     def _login_username_password(self):
         return dict(Authorization=basic_auth_header(self.username, self.password))
 
-    def _login_access_token(self):
-        return dict(Authorization="Bearer {0}".format(self.access_token))
+    def _login_access_token(self, access_token):
+        return dict(Authorization="Bearer {0}".format(access_token))
 
     def _login_oauth(self):
         if self.grant_type == "refresh_token":
@@ -127,7 +127,7 @@ class Client:
             raise UnexpectedAPIResponse(resp.status, resp.data)
 
         access_token = resp.json["access_token"]
-        return dict(Authorization="Bearer {0}".format(access_token))
+        return self._login_access_token(access_token)
 
     def _request(self, method, path, data=None, headers=None):
         try:
