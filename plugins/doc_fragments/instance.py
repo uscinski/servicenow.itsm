@@ -41,8 +41,8 @@ options:
         description:
           - Grant type used for OAuth authentication.
           - If not set, the value of the C(SN_GRANT_TYPE) environment variable will be used.
+          - Since version 2.3.0, it no longer has a default value.
         choices: [ 'password', 'refresh_token' ]
-        default: password
         type: str
         version_added: '1.1.0'
       client_id:
@@ -73,7 +73,7 @@ options:
           - If not set, the value of the C(SN_ACCESS_TOKEN) environment
             variable will be used.
         type: str
-        version_added: '2.2.0'
+        version_added: '2.3.0'
       timeout:
         description:
           - Timeout in seconds for the connection with the ServiceNow instance.
